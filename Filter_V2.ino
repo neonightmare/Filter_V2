@@ -8,11 +8,13 @@
 Servo myservo;  // create servo object to control a servo  
 
 // Pindefinitionen
-int PosFeedback   = A3;  // pink-Leitung des Aktors, FeedbacPosition
-int SetLinAktor   = 11; // weiss Digital Ausgang Aktror,
-int DruckSensor   = 13; // Drucksensor, pullup, neg. Logik
-int Ventil_L       = 6;  // Ansteuerung Ventil Phase
-int Ventil_N       = 7;  // Ansteuerung Ventil Phase
+int PosFeedback   = A3;  // pink-Leitung des Aktors, FeedbacPosition -> tuerkis Kabel -> Stecker PIN:7
+int SetLinAktor   = 11; // weiss Digital Ausgang Aktror -> weiss Kabel -> Stecker PIN:5
+                        // schwarz Aktor GND -> blau Kabel -> Stecker PIN:6
+                        // rot Aktor +12V -> violett Kabel -> Stecker PIN:8
+int DruckSensor   = 13; // Drucksensor, pullup, neg. Logik-> Stecker PIN:1 /2
+int Ventil_L       = 6;  // Ansteuerung Ventil Phase-> Stecker PIN:3
+int Ventil_N       = 7;  // Ansteuerung Ventil Phase-> Stecker PIN:4
 int on_off        = 10; // Eingang für on_off-Schalter
 int man_spuelen   = 12; // Eingang für manuellen Spülvorgang
 
