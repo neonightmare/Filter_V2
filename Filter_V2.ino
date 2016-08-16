@@ -1,11 +1,34 @@
 
-// Filterautomationscode 
-// Olivier Gottsponer, Arduino Uno, 7.8.2014
-// V2
+// Filterautomationscode
+// Olivier Gottsponer, Arduino Uno, 16.8.16
+// V3
 
-#include <Servo.h>  
+// Timing angepasst / 1x pro Woche & Ethernetanbindung...
+/*
+ Created by Rui Santos
+ Visit: http://randomnerdtutorials.com for more arduino projects
+        http://randomnerdtutorials.com/arduino-webserver-with-an-arduino-ethernet-shield/
 
-Servo myservo;  // create servo object to control a servo  
+//Einschalten mittels HTTP-Befehlen:
+//http://192.168.1.179/?button1on
+
+ Arduino with Ethernet Shield
+ */
+
+#include <SPI.h>
+#include <Ethernet.h>
+#include <Servo.h>
+
+Servo myservo;  // create servo object to control a servo
+
+//Ethernetserver Definitionen
+
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };   //physical mac address
+byte ip[] = { 192, 168, 1, 179 };                      // ip in lan (that's what you need to use in your browser. ("192.168.1.178")
+byte gateway[] = { 192, 168, 1, 1 };                   // internet access via router
+byte subnet[] = { 255, 255, 255, 0 };                  //subnet mask
+EthernetServer server(80);                             //server port
+String readString;
 
 // Pindefinitionen
 int PosFeedback   = A3;  // pink-Leitung des Aktors, FeedbacPosition -> tuerkis Kabel -> Stecker PIN:7
@@ -17,6 +40,7 @@ int Ventil_L       = 6;  // Ansteuerung Ventil Phase-> Stecker PIN:3
 int Ventil_N       = 7;  // Ansteuerung Ventil Phase-> Stecker PIN:4
 int on_off        = 10; // Eingang für on_off-Schalter
 int man_spuelen   = 12; // Eingang für manuellen Spülvorgang
+String            = spuelungAktiv;
 
 //Variablendeklarationen
 
@@ -24,8 +48,8 @@ int ms_max            = 2000;   // max. Aktorposition 2000, für def. Version 17
 int ms_min            = 1000;   // min. Aktorposition 1000, für def. Version 1300
 int ms_middle         = 1540;   // Mittenposition Aktor für def. Version 1500
 
-int verz_vor          = 4000;   // verzögerung vor Servobefehl 20
-int verz_nach         = 4000;   // Verzögerugn nach Servobefehl 5000
+int verz_vor          = 3000;   // verzögerung vor Servobefehl 20
+int verz_nach         = 3000;   // Verzögerugn nach Servobefehl 5000
 int verz_stability    = 20;     // Verzögerung loop(); Stabilität
 
 int ifstatus          = 0;
@@ -36,34 +60,40 @@ int linposition       = 0;
 
 unsigned long      lastTime     = 0;
 unsigned long      elapsedTime  = 0;
-unsigned long      waitTime     = 1800000; // (30 * 60 * 1000) = 30min
+unsigned long      waitTime     = 604800000; //1000*60*60*24*7  -> 1x pro Woche
 
-void setup() 
-{  
+void setup()
+{
 
   //attaches the servo on pin SetLinAktor to the servo object
   myservo.attach(SetLinAktor); // weisse-leitung des Aktors
   myservo.writeMicroseconds(ms_middle); //set initial servo position if desired
 
-  //Ein - AUsgänge definieren 
-  pinMode(Ventil_L, OUTPUT); 
-  pinMode(Ventil_N, OUTPUT); 
-  pinMode(DruckSensor, INPUT_PULLUP); 
-  pinMode(on_off, INPUT_PULLUP); 
-  pinMode(man_spuelen, INPUT_PULLUP);  
+  //Ein - AUsgänge definieren
+  pinMode(Ventil_L, OUTPUT);
+  pinMode(Ventil_N, OUTPUT);
+  pinMode(DruckSensor, INPUT_PULLUP);
+  pinMode(on_off, INPUT_PULLUP);
+  pinMode(man_spuelen, INPUT_PULLUP);
 
   //Ventile schliessen
   digitalWrite(Ventil_L, HIGH); // Ventil schliessen
   digitalWrite(Ventil_N, HIGH); // Ventil schliessen
 
+  // start the Ethernet connection and the server:
+  Ethernet.begin(mac, ip, gateway, subnet);
+  server.begin();
+  Serial.print("server is at ");
+  Serial.println(Ethernet.localIP());
+
   //start serial connection
   Serial.begin(9600);
-  Serial.println("Beginn Serial-Session: Filter_V2"); // so I can keep track of what is loaded
-} 
+  Serial.println("Beginn Serial-Session: Filter_V3"); // so I can keep track of what is loaded
+}
 
 
-void loop() 
-{     
+void loop()
+{
 
   //Berechnug der proz. Position, nicht als Deklaration möglich...
   int   prozmax = (ms_max/10)-100-4;  // 96% maximum //für def. Version 66%
@@ -72,30 +102,48 @@ void loop()
   //Linearposition abgfragen
   int(linposition)    = analogRead(PosFeedback) * (100 / 673.46);
 
+  //Taster abfragen
+  on_off_read         = digitalRead(on_off);
+  man_spuelen_read    = digitalRead(man_spuelen);
+  druckabfall_read    = digitalRead(DruckSensor);
 
   //Wartezeit bis zur nächsten Spülung
-  if (elapsedTime >= waitTime) 
+  if (elapsedTime >= waitTime)
   {
     ifstatus = 0;
   }
 
-  //Taster, Sensoren abfragen	
-  if (ifstatus == 0)
-  {
-    druckabfall_read    = digitalRead(DruckSensor);
-    delay(verz_stability);
-  }
-  on_off_read         = digitalRead(on_off);
-  man_spuelen_read    = digitalRead(man_spuelen);
+  case ifstatus
+        switch 1 : spuelungAktiv = 'Spülvorgang läuft';break;
+        switch 2 : spuelungAktiv =' Spülung Minimum 1';break;
+        switch 3 : spuelungAktiv = 'Spülung Maximum 1';break;
+        switch 4 : spuelungAktiv = 'Spülung Minimum 2';break;
+        switch 5 : spuelungAktiv = 'Spülung Maximum 2';break;
+        switch 6 : spuelungAktiv = 'Spülung Minimum 3';break;
+        switch 7 : spuelungAktiv = 'Spülung Maximum 3';break;
+        switch 8 : spuelungAktiv = 'Spülung StandBy';break;
+  //Taster, Sensoren abfragen
+  //  if (ifstatus == 0)
+  //{
+  //  druckabfall_read    = digitalRead(DruckSensor);
+  //  delay(verz_stability);
+  //}
 
-
-
-
-  if ((druckabfall_read == HIGH) && (on_off_read == LOW) && (ifstatus == 0))  // Sensor, on_off pruefen, pull-up inverte logik
+  if ((druckabfall_read == HIGH) && (on_off_read == LOW))  // Sensor, on_off pruefen, pull-up inverte logik
   {
     digitalWrite(Ventil_L, LOW); // Ventil öffnen
     digitalWrite(Ventil_N, LOW); // Ventil öffnen
     myservo.writeMicroseconds(ms_max);
+    delay(verz_nach);
+    ifstatus = 1;
+  }
+
+  else if ((on_off_read == LOW) && (ifstatus == 0))  //on_off pruefen, pull-up inverte logik
+  {
+    digitalWrite(Ventil_L, LOW); // Ventil öffnen
+    digitalWrite(Ventil_N, LOW); // Ventil öffnen
+    myservo.writeMicroseconds(ms_max);
+    delay(verz_nach);
     ifstatus = 1;
   }
 
@@ -103,56 +151,57 @@ void loop()
   {
     digitalWrite(Ventil_L, LOW); // Ventil öffnen
     digitalWrite(Ventil_N, LOW); // Ventil öffnen
-    myservo.writeMicroseconds(ms_max); 
+    myservo.writeMicroseconds(ms_max);
+    delay(verz_nach);
     ifstatus = 1;
   }
 
   if ((linposition <=  prozmin) && (ifstatus == 1)) //MAX 1
   {
-    delay(verz_vor);
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_min);
     delay(verz_nach);
     ifstatus = 2;
   }
 
   else if ((linposition >=  prozmax) && (ifstatus == 2))//MIN 1
-  { 
-    delay(verz_vor);
+  {
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_max);
     delay(verz_nach);
-    ifstatus = 3;     
+    ifstatus = 3;
   }
 
   else if ((linposition <=  prozmin) && (ifstatus == 3)) //MAX 2
-  { 
-    delay(verz_vor);
+  {
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_min);
     delay(verz_nach);
-    ifstatus = 4;     
+    ifstatus = 4;
   }
 
   else if ((linposition >=  prozmax) && (ifstatus == 4))//MIN 2
-  { 
-    delay(verz_vor);
+  {
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_max);
     delay(verz_nach);
-    ifstatus = 5;     
-  }  
+    ifstatus = 5;
+  }
   else if ((linposition <=  prozmin) && (ifstatus == 5)) //MAX 3
-  { 
-    delay(verz_vor);
+  {
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_min);
     delay(verz_nach);
-    ifstatus = 6;     
+    ifstatus = 6;
   }
 
   else if ((linposition >=  prozmax) && (ifstatus == 6 ))//MIN 3
-  { 
-    delay(verz_vor);
+  {
+  //  delay(verz_vor);
     myservo.writeMicroseconds(ms_max);
     delay(verz_nach);
-    ifstatus = 7;     
-  }  
+    ifstatus = 7;
+  }
 
   if (ifstatus == 7)
   {
@@ -163,32 +212,92 @@ void loop()
     lastTime = millis();
     ifstatus = 8;
   }
-  
-  if (ifstatus == 8 )
-  {
-      elapsedTime = (millis() - lastTime);
+
+// Create a client connection
+  EthernetClient client = server.available();
+    if (client) {
+      while (client.connected()) {
+        if (client.available()) {
+          char c = client.read();
+
+          //read char by char HTTP request
+          if (readString.length() < 100) {
+            //store characters to string
+            readString += c;
+            //Serial.print(c);
+           }
+
+           //if HTTP request has ended
+           if (c == '\n') {
+             Serial.println(readString); //print to serial monitor for debuging
+
+             client.println("HTTP/1.1 200 OK"); //send new page
+             client.println("Content-Type: text/html");
+             client.println();
+             client.println("<HTML>");
+             client.println("<HEAD>");
+             client.println("<meta name='apple-mobile-web-app-capable' content='yes' />");
+             client.println("<meta name='apple-mobile-web-app-status-bar-style' content='black-translucent' />");
+             client.println("<link rel='stylesheet' type='text/css' href='http://randomnerdtutorials.com/ethernetcss.css' />");
+             client.println("<TITLE>Arduino Fernsteuerung</TITLE>");
+             client.println("</HEAD>");
+             client.println("<BODY>");
+             client.println("<H1>Relay Switch  Webserver - Filterspuelung</H1>");
+             client.println("<hr />");
+             client.println("<br />");
+             client.println("<H2>Arduino with Ethernet Shield</H2>");
+             client.println("<br />");
+             client.println("<a href=\"/?button1on\"\">Turn On Filter </a>");
+             client.println("<br />");
+             client.println("<br />");
+             // print the current readings, in HTML format:
+             client.print("Status Spülung: ");
+             client.print(spuelungAktiv);
+             client.println("<br />");
+             client.println("<br />");
+             client.print("Position Spülung: ");
+             client.print(linposition);
+             client.print("%");
+             client.println("<br />");
+             client.println("<br />");
+
+             client.println("<p>modified by neonightmre</p>");
+             client.println("<br />");
+             client.println("</BODY>");
+             client.println("</HTML>");
+
+             delay(1);
+             //stopping client
+             client.stop();
+             //controls the Arduino if you press the buttons
+             if (readString.indexOf("?button1on") >0){
+               ifstatus = 0;
+             }
+              readString="";
+
+           }
+         }
+      }
   }
-  delay(verz_stability);
+
+
+
+  //  if (ifstatus == 8 )
+  //  {
+        elapsedTime = (millis() - lastTime);
+  //  }
+    delay(verz_stability);
+
 
   // Ausgabe div. Daten auf Konsole
   Serial.println("lastTime:"); // so I can keep track of what is loaded
-  Serial.println(lastTime); 
+  Serial.println(lastTime);
   Serial.println("aktMillis"); // so I can keep track of what is loaded
-  Serial.println(millis()); 
+  Serial.println(millis());
   Serial.println("Elapsedtime:"); // so I can keep track of what is loaded
-  Serial.println(elapsedTime); 
+  Serial.println(elapsedTime);
   Serial.println("Status:"); // so I can keep track of what is loaded
   Serial.println(ifstatus);
   Serial.println("Linearposition:"); // so I can keep track of what is loaded
-  Serial.println(int(linposition)); 
-}	
-
-
-
-
-
-
-
-
-
-
+  Serial.println(int(linposition));
+}
