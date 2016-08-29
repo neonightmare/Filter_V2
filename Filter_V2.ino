@@ -40,7 +40,7 @@ int Ventil_L       = 6;  // Ansteuerung Ventil Phase-> Stecker PIN:3
 int Ventil_N       = 7;  // Ansteuerung Ventil Phase-> Stecker PIN:4
 int on_off        = 10; // Eingang für on_off-Schalter
 int man_spuelen   = 12; // Eingang für manuellen Spülvorgang
-String            = spuelungAktiv;
+String  spuelungAktiv;
 
 //Variablendeklarationen
 
@@ -49,14 +49,16 @@ int ms_min            = 1000;   // min. Aktorposition 1000, für def. Version 13
 int ms_middle         = 1540;   // Mittenposition Aktor für def. Version 1500
 
 int verz_vor          = 3000;   // verzögerung vor Servobefehl 20
-int verz_nach         = 3000;   // Verzögerugn nach Servobefehl 5000
-int verz_stability    = 20;     // Verzögerung loop(); Stabilität
+int verz_nach         = 2000;   // Verzögerugn nach Servobefehl 5000
+int verz_stability    = 5;     // Verzögerung loop(); Stabilität
 
 int ifstatus          = 0;
 int druckabfall_read  = LOW;
 int on_off_read       = HIGH;
 int man_spuelen_read  = HIGH;
 int linposition       = 0;
+bool  linposStateMin     = false;
+bool  linposStateMax     = false;
 
 unsigned long      lastTime     = 0;
 unsigned long      elapsedTime  = 0;
@@ -109,109 +111,75 @@ void loop()
 
   //Wartezeit bis zur nächsten Spülung
   if (elapsedTime >= waitTime)
-  {
-    ifstatus = 0;
-  }
-
-  case ifstatus
-        switch 1 : spuelungAktiv = 'Spülvorgang läuft';break;
-        switch 2 : spuelungAktiv =' Spülung Minimum 1';break;
-        switch 3 : spuelungAktiv = 'Spülung Maximum 1';break;
-        switch 4 : spuelungAktiv = 'Spülung Minimum 2';break;
-        switch 5 : spuelungAktiv = 'Spülung Maximum 2';break;
-        switch 6 : spuelungAktiv = 'Spülung Minimum 3';break;
-        switch 7 : spuelungAktiv = 'Spülung Maximum 3';break;
-        switch 8 : spuelungAktiv = 'Spülung StandBy';break;
-  //Taster, Sensoren abfragen
-  //  if (ifstatus == 0)
-  //{
-  //  druckabfall_read    = digitalRead(DruckSensor);
-  //  delay(verz_stability);
-  //}
+  { ifstatus = 1;}
 
   if ((druckabfall_read == HIGH) && (on_off_read == LOW))  // Sensor, on_off pruefen, pull-up inverte logik
-  {
-    digitalWrite(Ventil_L, LOW); // Ventil öffnen
-    digitalWrite(Ventil_N, LOW); // Ventil öffnen
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 1;
-  }
+    { ifstatus = 1;};
 
-  else if ((on_off_read == LOW) && (ifstatus == 0))  //on_off pruefen, pull-up inverte logik
-  {
-    digitalWrite(Ventil_L, LOW); // Ventil öffnen
-    digitalWrite(Ventil_N, LOW); // Ventil öffnen
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 1;
-  }
+  if (man_spuelen_read == LOW)  // manuell, pull-up inverte logik
+    { ifstatus = 1;};
 
-  else if (man_spuelen_read == LOW)  // manuell, pull-up inverte logik
-  {
-    digitalWrite(Ventil_L, LOW); // Ventil öffnen
-    digitalWrite(Ventil_N, LOW); // Ventil öffnen
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 1;
-  }
+  if (linposition <=  prozmin)
+    { linposStateMin = true;}; // minimum Position
 
-  if ((linposition <=  prozmin) && (ifstatus == 1)) //MAX 1
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_min);
-    delay(verz_nach);
-    ifstatus = 2;
-  }
+  if (linposition >=  prozmax)
+    { linposStateMax = true;}; //maximum Position
 
-  else if ((linposition >=  prozmax) && (ifstatus == 2))//MIN 1
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 3;
-  }
+  switch (ifstatus) {
+        case 1 :  {
+                  spuelungAktiv = 'Spülvorgang läuft';
+                  digitalWrite(Ventil_L, LOW); // Ventil öffnen
+                  digitalWrite(Ventil_N, LOW); // Ventil öffnen
+                  myservo.writeMicroseconds(ms_max);
+                  delay(verz_nach);
+                  if (linposStateMax) {ifstatus = 2;};
+                };break;
+        case 2 : {
+                  spuelungAktiv =' Spülung Minimum 1';
+                  myservo.writeMicroseconds(ms_min);
+                  delay(verz_nach);
+                  if (linposStateMin) {ifstatus = 3;};
+                };break;
+        case 3 : {
+                  spuelungAktiv = 'Spülung Maximum 2';
+                  myservo.writeMicroseconds(ms_max);
+                  delay(verz_nach);
+                  if (linposStateMax) {ifstatus = 4;};
+                };break;
+        case 4 : {
+                  spuelungAktiv = 'Spülung Minimum 2';
+                  myservo.writeMicroseconds(ms_min);
+                  delay(verz_nach);
+                  if (linposStateMin) {ifstatus = 5;};
+                };break;
+        case 5 : {
+                  spuelungAktiv = 'Spülung Maximum 3';
+                  myservo.writeMicroseconds(ms_max);
+                  delay(verz_nach);
+                  if (linposStateMax) {ifstatus = 6;};
+                };break;
+        case 6 : {
+                  spuelungAktiv = 'Spülung Minimum 3';
+                  myservo.writeMicroseconds(ms_min);
+                  delay(verz_nach);
+                  if (linposStateMin) {ifstatus = 7;};
+                };break;
 
-  else if ((linposition <=  prozmin) && (ifstatus == 3)) //MAX 2
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_min);
-    delay(verz_nach);
-    ifstatus = 4;
-  }
+        case 7 : {
+                  spuelungAktiv = 'Spülung StandBy';
+                  myservo.writeMicroseconds(ms_middle); //set initial servo position if desired
+                  digitalWrite(Ventil_L, HIGH); // Ausgang Ventil schliessen
+                  digitalWrite(Ventil_N, HIGH); // Ausgang Ventil schliessen
+                  lastTime = millis();
+                  ifstatus = 0;
+                };break;
+        default:break;
+      }
 
-  else if ((linposition >=  prozmax) && (ifstatus == 4))//MIN 2
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 5;
-  }
-  else if ((linposition <=  prozmin) && (ifstatus == 5)) //MAX 3
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_min);
-    delay(verz_nach);
-    ifstatus = 6;
-  }
+      elapsedTime = (millis() - lastTime);
+      delay(verz_stability);
 
-  else if ((linposition >=  prozmax) && (ifstatus == 6 ))//MIN 3
-  {
-  //  delay(verz_vor);
-    myservo.writeMicroseconds(ms_max);
-    delay(verz_nach);
-    ifstatus = 7;
-  }
-
-  if (ifstatus == 7)
-  {
-    myservo.writeMicroseconds(ms_middle);
-    digitalWrite(Ventil_L, HIGH); // Ausgang Ventil schliessen
-    digitalWrite(Ventil_N, HIGH); // Ausgang Ventil schliessen
-    //delay(verz_nach_spuelen);
-    lastTime = millis();
-    ifstatus = 8;
-  }
+//////// Server - Funktionalität /////////////
 
 // Create a client connection
   EthernetClient client = server.available();
@@ -280,16 +248,7 @@ void loop()
       }
   }
 
-
-
-  //  if (ifstatus == 8 )
-  //  {
-        elapsedTime = (millis() - lastTime);
-  //  }
-    delay(verz_stability);
-
-
-  // Ausgabe div. Daten auf Konsole
+  ////////// Ausgabe div. Daten auf Konsole ////////////////
   Serial.println("lastTime:"); // so I can keep track of what is loaded
   Serial.println(lastTime);
   Serial.println("aktMillis"); // so I can keep track of what is loaded
